@@ -8,6 +8,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Найти самую новую копию проекта
+        id: find
+        run: |
+          best=""; bestv="0"
+          while IFS= read -r f; do
+            d=$(dirname "$f")
+            pf=$(find "$d/app/src" -name ProxyServer.kt 2>/dev/null | head -n1)
+            [ -z "$pf" ] && continue
+            v=$(grep -o 'Версия ядра: [0-9.]*' "$pf" | head -n1 | grep -o '[0-9.]*$')
+            [ -z "$v" ] && v="0"
+            echo "копия: $d  версия: $v"
+            if [ "$(printf '%s\n%s\n' "$bestv" "$v" | sort -V | tail -n1)" = "$v" ]; then best="$d"; bestv="$v"; fi
+          done < <(find . -name settings.gradle.kts -not -path './.git/*')
+          if [ -z "$best" ]; then echo "Проект не найден"; exit 1; fi
+          echo "СОБИРАЮ: $best  версия $bestv"
+          echo "dir=$best" >> "$GITHUB_OUTPUT"
+          echo "ver=$bestv" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -15,8 +32,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.14.3
-      - run: gradle --no-daemon -p tg-proxy-android/tg-proxy-android assembleDebug
+      - run: gradle --no-daemon -p "${{ steps.find.outputs.dir }}" assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: TgProxy-debug-apk
-          path: tg-proxy-android/tg-proxy-android/app/build/outputs/apk/debug/*.apk
+          name: TgProxy-v${{ steps.find.outputs.ver }}-debug-apk
+          path: ${{ steps.find.outputs.dir }}/app/build/outputs/apk/debug/*.apk
