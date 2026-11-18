@@ -90,6 +90,7 @@ class ProxyServer(
                 executor.execute { ClientConn(c).run() }
             }
         }
+        log("Версия ядра: 1.1 (диагностика отказов, 167.220 для всех DC)")
         log("Прокси слушает ${cfg.bindHost}:${ss.localPort}")
     }
 
@@ -107,6 +108,8 @@ class ProxyServer(
 
     /** attempt == null — клиент закрыл соединение. */
     private class Event(val attempt: Attempt?, val reason: String)
+
+    private val deadDc = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     private fun order(routes: List<Route>, dcKey: String): List<Route> {
         val now = System.currentTimeMillis()
@@ -290,6 +293,10 @@ class ProxyServer(
         }
 
         private fun supervise(routes: List<Route>) {
+            // DC, к которому только что не достучались ни по одному маршруту: не держим клиента
+            // ещё 15–20 с на заведомо мёртвых маршрутах (это забивает потоки и вешает приложение).
+            val deadAt = deadDc[dcKey]
+            if (deadAt != null && System.currentTimeMillis() - deadAt < DEAD_DC_MS) return
             var idx = 0
             var retryFresh: Route? = null
             while (!clientClosed) {
@@ -307,7 +314,10 @@ class ProxyServer(
                     }
                 }
                 if (attempt == null) {
-                    if (!clientClosed) log("$dcLabel: все маршруты недоступны")
+                    if (!clientClosed) {
+                        deadDc[dcKey] = System.currentTimeMillis()
+                        log("$dcLabel: все маршруты недоступны (пауза ${DEAD_DC_MS / 1000} с)")
+                    }
                     return
                 }
                 val att: Attempt = attempt
@@ -395,5 +405,6 @@ class ProxyServer(
     companion object {
         private const val MAX_PENDING = 1 shl 20
         private const val FAIL_PENALTY_MS = 60_000L
+        private const val DEAD_DC_MS = 30_000L
     }
 }
