@@ -15,8 +15,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.14.3
-      - run: gradle --no-daemon -p tg-proxy-android assembleDebug
+      - run: gradle --no-daemon -p tg-proxy-android/tg-proxy-android assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: TgProxy-debug-apk
-          path: tg-proxy-android/app/build/outputs/apk/debug/*.apk
+          path: tg-proxy-android/tg-proxy-android/app/build/outputs/apk/debug/*.apk
