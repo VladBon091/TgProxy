@@ -16,7 +16,7 @@ jobs:
             d=$(dirname "$f")
             pf=$(find "$d/app/src" -name ProxyServer.kt 2>/dev/null | head -n1)
             [ -z "$pf" ] && continue
-            v=$(grep -o 'Версия ядра: [0-9.]*' "$pf" | head -n1 | grep -o '[0-9.]*$')
+            v=$(grep -o "Версия ядра: [0-9.]*" "$pf" | head -n1 | grep -o "[0-9.]*$" || true)
             [ -z "$v" ] && v="0"
             echo "копия: $d  версия: $v"
             if [ "$(printf '%s\n%s\n' "$bestv" "$v" | sort -V | tail -n1)" = "$v" ]; then best="$d"; bestv="$v"; fi
